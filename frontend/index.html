@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Access</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { 
+            background: #edf2f7; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px;
+        }
+        .login-card { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            width: 100%; 
+            max-width: 400px; 
+        }
+        h2 { margin-top: 0; color: #2d3748; font-size: 1.5rem; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #4a5568; font-size: 0.9rem; font-weight: 500; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid #cbd5e0; 
+            border-radius: 6px; 
+            font-size: 1rem;
+            background: #f7fafc;
+        }
+        input:focus { outline: none; border-color: #4a5568; background: white; }
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            background: #4a5568; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            font-size: 1rem;
+            cursor: pointer; 
+            margin-top: 10px;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2d3748; }
+        #err { color: #e53e3e; font-size: 0.9rem; margin-top: 15px; text-align: center; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>System Authorization</h2>
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" autocomplete="username">
+        </div>
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" autocomplete="current-password">
+        </div>
+        <button onclick="handleLogin()">Authenticate</button>
+        <p id="err"></p>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000"; 
+        async function handleLogin() {
+            const formData = new FormData();
+            formData.append("username", document.getElementById("username").value);
+            formData.append("password", document.getElementById("password").value);
+            
+            const res = await fetch(`${API_URL}/login`, { method: "POST", body: formData });
+            if(res.ok) {
+                const data = await res.json();
+                localStorage.setItem("token", data.access_token);
+                window.location.href = data.role === "admin" ? "admin.html" : "user.html";
+            } else {
+                document.getElementById("err").innerText = "Invalid security credentials.";
+            }
+        }
+    </script>
+</body>
+</html>
+

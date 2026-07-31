@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrative Terminal</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { margin: 0; background: #edf2f7; color: #1a202c; padding: 15px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        header { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            margin-bottom: 25px; 
+            padding-bottom: 15px; 
+            border-bottom: 1px solid #cbd5e0; 
+        }
+        h1 { margin: 0; font-size: 1.5rem; text-align: center; }
+        .logout-btn { 
+            padding: 10px 20px; 
+            background: #cbd5e0; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            font-weight: 600;
+            width: 100%;
+        }
+        
+        .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        h3 { margin-top: 0; color: #2d3748; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; font-size: 1.1rem; }
+        
+        .form-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 1rem; }
+        textarea { height: 80px; resize: vertical; }
+        
+        .btn { padding: 12px 20px; background: #4a5568; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+        .btn-purge { padding: 4px 8px; background: #fed7d7; color: #c53030; border-radius: 4px; border: none; font-weight: 600; cursor: pointer; }
+        
+        ul { list-style: none; padding: 0; margin: 15px 0 0 0; }
+        li { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f7fafc; margin-bottom: 5px; border-radius: 4px; font-size: 0.95rem; }
+
+        /* Mobile Responsive View for Tickets (Card blocks instead of a wide table) */
+        .responsive-table-container { width: 100%; }
+        .table-desktop { display: none; width: 100%; border-collapse: collapse; text-align: left; }
+        .table-desktop th, .table-desktop td { padding: 12px; border: 1px solid #e2e8f0; }
+        .table-desktop th { background: #f7fafc; }
+        
+        .cards-mobile { display: flex; flex-direction: column; gap: 15px; }
+        .ticket-card { background: #f7fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; }
+        .ticket-card-row { margin-bottom: 8px; font-size: 0.95rem; }
+        .ticket-card-row span { font-weight: bold; color: #4a5568; }
+
+        /* Desktop Screens (PCs) */
+        @media (min-width: 768px) {
+            body { padding: 30px; }
+            header { flex-direction: row; justify-content: space-between; align-items: center; }
+            h1 { font-size: 2rem; text-align: left; }
+            .logout-btn { width: auto; }
+            .form-group { flex-direction: row; align-items: center; }
+            .form-group input, .form-group select { width: auto; flex: 1; }
+            .btn { width: auto; }
+            
+            .cards-mobile { display: none; }
+            .table-desktop { display: table; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Master Admin Console</h1>
+            <button class="logout-btn" onclick="localStorage.clear(); window.location.href='index.html'">Logout Terminal</button>
+        </header>
+
+        <div class="section">
+            <h3>User Management Registry</h3>
+            <div class="form-group">
+                <input type="text" id="u" placeholder="New Account Name"> 
+                <input type="text" id="p" placeholder="Initial Key">
+                <select id="r">
+                    <option value="user">Operator (User)</option>
+                    <option value="admin">Administrator</option>
+                </select>
+                <button class="btn" onclick="createUser()">Provision</button>
+            </div>
+            <ul id="user-list"></ul>
+        </div>
+
+        <div class="section">
+            <h3>Broadcast System Board Message</h3>
+            <div style="max-width: 500px;">
+                <div class="form-group"><input type="text" id="nt" placeholder="Message Title"></div>
+                <div class="form-group"><textarea id="nc" placeholder="Content text..."></textarea></div>
+                <button class="btn" onclick="postNews()">Publish Notice</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Global Live Incident Reports</h3>
+            <div class="responsive-table-container">
+                <!-- Mobile Structure (visible on small viewports) -->
+                <div id="tickets-cards" class="cards-mobile"></div>
+                
+                <!-- Desktop View (visible on PCs) -->
+                <table class="table-desktop">
+                    <thead>
+                        <tr><th>ID</th><th>Op ID</th><th>Target App</th><th>Device</th><th>Logs / Description</th><th>Timestamp</th><th>Status</th><th>Resolution</th></tr>
+                    </thead>
+                    <tbody id="tickets-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000";
+        const headers = { "Authorization": `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" };
+
+        async function createUser() {
+            const body = { username: document.getElementById("u").value, password: document.getElementById("p").value, role: document.getElementById("r").value };
+            const res = await fetch(`${API_URL}/admin/users`, { method:"POST", headers, body: JSON.stringify(body) });
+            if(res.ok) { document.getElementById("u").value=""; document.getElementById("p").value=""; loadUsers(); }
+        }
+        async function loadUsers() {
+            const res = await fetch(`${API_URL}/admin/users`, { headers });
+            const data = await res.json();
+            document.getElementById("user-list").innerHTML = data.map(user => `<li><span><b>${user.username}</b> [${user.role}]</span> ${user.username !== 'admin' ? `<button class="btn-purge" onclick="deleteUser(${user.id})">Purge</button>` : ''}</li>`).join("");
+        }
+        async function deleteUser(id) {
+            if(confirm("Confirm user database deletion?")) {
+                await fetch(`${API_URL}/admin/users/${id}`, { method:"DELETE", headers });
+                loadUsers();
+            }
+        }
+        async function postNews() {
+            const body = { title: document.getElementById("nt").value, content: document.getElementById("nc").value };
+            const res = await fetch(`${API_URL}/admin/news`, { method:"POST", headers, body: JSON.stringify(body) });
+            if(res.ok) { alert("Notice published."); document.getElementById("nt").value=""; document.getElementById("nc").value=""; }
+        }
+        async function loadTickets() {
+            const res = await fetch(`${API_URL}/admin/tickets`, { headers });
+            const data = await res.json();
+            
+            // Build Desktop view data grid row elements
+            document.getElementById("tickets-table").innerHTML = data.map(t => `
+                <tr style="${t.status === 'closed' ? 'background:#f8fafc; color:#a0aec0;' : ''}">
+                    <td>${t.id}</td><td>${t.user_id}</td><td><b>${t.app_name}</b></td><td>${t.device}</td><td>${t.description}</td><td>${t.timestamp}</td><td><span style="color:${t.status === 'active' ? '#2f855a' : '#718096'}">${t.status}</span></td>
+                    <td>${t.status === 'active' ? `<button onclick="closeTicket(${t.id})" style="padding:4px 8px; cursor:pointer;">Close</button>` : 'Resolved'}</td>
+                </tr>`).join("");
+
+            // Build Mobile view blocks
+            document.getElementById("tickets-cards").innerHTML = data.map(t => `
+                <div class="ticket-card" style="${t.status === 'closed' ? 'opacity: 0.6;' : ''}">
+                    <div class="ticket-card-row"><span>ID:</span> ${t.id} (Op ID: ${t.user_id})</div>
+                    <div class="ticket-card-row"><span>App:</span> ${t.app_name}</div>
+                    <div class="ticket-card-row"><span>Device:</span> ${t.device}</div>
+                    <div class="ticket-card-row"><span>Log:</span> ${t.description}</div>
+                    <div class="ticket-card-row"><span>Time:</span> ${t.timestamp}</div>
+                    <div class="ticket-card-row"><span>Status:</span> <span style="color:${t.status === 'active' ? '#2f855a' : '#718096'}">${t.status}</span></div>
+                    <div style="margin-top:10px;">
+                        ${t.status === 'active' ? `<button onclick="closeTicket(${t.id})" style="width:100%; padding:8px; cursor:pointer;">Close Ticket</button>` : '<b>Resolved</b>'}
+                    </div>
+                </div>`).join("");
+        }
+        async function closeTicket(id) {
+            await fetch(`${API_URL}/admin/tickets/${id}/close`, { method:"PUT", headers });
+            loadTickets();
+        }
+        loadUsers(); loadTickets();
+    </script>
+</body>
+</html>
+

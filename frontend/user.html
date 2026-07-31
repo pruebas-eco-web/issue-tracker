@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Interface</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { margin: 0; background: #f7fafc; color: #2d3748; padding: 15px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        header { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+            margin-bottom: 25px; 
+            padding-bottom: 15px; 
+            border-bottom: 1px solid #e2e8f0; 
+        }
+        h1 { margin: 0; font-size: 1.5rem; text-align: center; }
+        .logout-btn { 
+            padding: 10px 20px; 
+            background: #e2e8f0; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 6px; 
+            font-weight: 600;
+            width: 100%;
+        }
+        
+        .grid-layout { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        .box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        h3 { margin-top: 0; color: #4a5568; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; font-size: 1.1rem; }
+        
+        .form-row { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        input, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            border: 1px solid #cbd5e0; 
+            border-radius: 6px; 
+            font-size: 1rem; 
+        }
+        textarea { height: 120px; resize: vertical; }
+        
+        .action-btn { 
+            padding: 12px 24px; 
+            background: #3182ce; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            width: 100%;
+        }
+        .secondary-btn { background: #4a5568; }
+        
+        .news-item { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #edf2f7; }
+        .news-item:last-child { border: none; margin: 0; padding: 0; }
+        
+        /* Desktop Screens (PCs) */
+        @media (min-width: 768px) {
+            body { padding: 30px; }
+            header { flex-direction: row; justify-content: space-between; align-items: center; }
+            h1 { font-size: 2rem; text-align: left; }
+            .logout-btn { width: auto; }
+            .grid-layout { grid-template-columns: 1fr 1fr; }
+            .full-width { grid-column: span 2; }
+            .form-row-inline { flex-direction: row; }
+            .action-btn { width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>User Operations</h1>
+            <button class="logout-btn" onclick="localStorage.clear(); window.location.href='index.html'">Term Session</button>
+        </header>
+
+        <div class="grid-layout">
+            <div class="box">
+                <h3>Update Account Security</h3>
+                <div class="form-row">
+                    <input type="text" id="new_user" placeholder="Change Username">
+                    <input type="password" id="new_pass" placeholder="Change Password">
+                </div>
+                <button class="action-btn secondary-btn" onclick="updateCreds()">Commit Changes</button>
+            </div>
+
+            <div class="box">
+                <h3>System Announcements</h3>
+                <div id="news-container">Checking system wire...</div>
+            </div>
+
+            <div class="box full-width">
+                <h3>File Technical Issue Report</h3>
+                <div class="form-row">
+                    <input type="text" id="app_name" placeholder="Application Designation">
+                </div>
+                <div class="form-row">
+                    <input type="text" id="device" placeholder="Target Device Specification">
+                </div>
+                <div class="form-row">
+                    <textarea id="desc" placeholder="Provide complete logs / description of fault..."></textarea>
+                </div>
+                <button class="action-btn" onclick="sendTicket()">Dispatch Report</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8000";
+        const headers = { "Authorization": `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" };
+
+        async function updateCreds() {
+            const body = { username: document.getElementById("new_user").value, password: document.getElementById("new_pass").value };
+            const res = await fetch(`${API_URL}/user/update-credentials`, { method:"PUT", headers, body: JSON.stringify(body) });
+            alert(res.ok ? "Account credentials safely updated." : "Update failed.");
+        }
+
+        async function sendTicket() {
+            const body = { app_name: document.getElementById("app_name").value, device: document.getElementById("device").value, description: document.getElementById("desc").value };
+            const res = await fetch(`${API_URL}/tickets`, { method:"POST", headers, body: JSON.stringify(body) });
+            if(res.ok) { alert("Ticket saved to remote database."); document.getElementById("app_name").value=""; document.getElementById("device").value=""; document.getElementById("desc").value=""; }
+        }
+
+        async function loadNews() {
+            const res = await fetch(`${API_URL}/news`, { headers });
+            if(res.ok) {
+                const data = await res.json();
+                document.getElementById("news-container").innerHTML = data.length ? data.map(n => `<div class="news-item"><b>📢 ${n.title}</b><p style="margin:5px 0 0 0; color:#4a5568; font-size:0.95rem;">${n.content}</p></div>`).join("") : "No new system updates.";
+            }
+        }
+        loadNews();
+    </script>
+</body>
+</html>
