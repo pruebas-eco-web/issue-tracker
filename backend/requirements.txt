@@ -3,7 +3,8 @@ uvicorn==0.30.6
 sqlalchemy==2.0.32
 pymysql==1.1.1
 cryptography==42.0.5
-passlib[bcrypt]==1.7.4
+passlib[bcrypt]
+bcrypt==4.0.1
 pyjwt==2.9.0
 python-multipart==0.0.9
 aiosmtplib==3.0.2
