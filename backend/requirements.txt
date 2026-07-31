@@ -4,7 +4,7 @@ sqlalchemy==2.0.32
 pymysql==1.1.1
 cryptography==42.0.5
 passlib[bcrypt]
-bcrypt==4.0.1
+bcrypt==3.2.2
 pyjwt==2.9.0
 python-multipart==0.0.9
 aiosmtplib==3.0.2
