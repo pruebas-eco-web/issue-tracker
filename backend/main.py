@@ -9,7 +9,11 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, event
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from passlib.context import CryptContext
+
+# --- REPLACED PASSLIB WITH PWDLIB ---
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
+
 import jwt
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -39,7 +43,10 @@ if not SECRET_KEY:
     raise RuntimeError("CRITICAL ERROR: JWT_SECRET_KEY environment variable is not set!")
 
 ALGORITHM = "HS256"
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# --- REPLACED PASSLIB CONTEXT WITH PWDLIB INSTANCE ---
+password_hash = PasswordHash((BcryptHasher(),))
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # 3. DATABASE MODELS
@@ -101,7 +108,8 @@ def seed_database():
     db = SessionLocal()
     try:
         if not db.query(UserDB).filter(UserDB.username == "admin").first():
-            db.add(UserDB(username="admin", hashed_password=pwd_context.hash("admin123"), role="admin"))
+            # UPDATED: Using password_hash.hash() instead of pwd_context.hash()
+            db.add(UserDB(username="admin", hashed_password=password_hash.hash("admin123"), role="admin"))
             db.add(NewsDB(title="System Operational", content="Securely integrated live asynchronous email system."))
             db.commit()
     finally:
@@ -109,7 +117,7 @@ def seed_database():
 
 seed_database()
 
-# 5. ASYNCHRONOUS SECURE EMAIL UTILITY (Runs silently in backend thread pool)
+# 5. ASYNCHRONOUS SECURE EMAIL UTILITY
 async def send_admin_notification_email(ticket_id: int, username: str, app_name: str, device: str, description: str, timestamp: str):
     if not all([SMTP_HOST, SMTP_USER, SMTP_PASSWORD, ADMIN_EMAIL]):
         print("[MAIL SYSTEM WARNING]: Email variables missing in Render dashboard. Notification skipped.")
@@ -185,7 +193,8 @@ def require_admin(user: UserDB = Depends(get_current_user)):
 @app.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.username == form_data.username).first()
-    if not user or not pwd_context.verify(form_data.password, user.hashed_password):
+    # UPDATED: Using password_hash.verify() instead of pwd_context.verify()
+    if not user or not password_hash.verify(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect credentials.")
     token = jwt.encode({"sub": user.username}, SECRET_KEY, algorithm=ALGORITHM)
     return {"access_token": token, "token_type": "bearer", "role": user.role}
@@ -198,7 +207,8 @@ async def update_credentials(data: dict, current_user: UserDB = Depends(get_curr
             raise HTTPException(status_code=400, detail="Username is already taken.")
         current_user.username = data["username"]
     if "password" in data and data["password"]:
-        current_user.hashed_password = pwd_context.hash(data["password"])
+        # UPDATED: Using password_hash.hash()
+        current_user.hashed_password = password_hash.hash(data["password"])
     db.commit()
     return {"status": "success"}
 
@@ -209,7 +219,8 @@ async def admin_create_user(data: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User already exists.")
     new_user = UserDB(
         username=data["username"],
-        hashed_password=pwd_context.hash(data["password"]),
+        # UPDATED: Using password_hash.hash()
+        hashed_password=password_hash.hash(data["password"]),
         role=data.get("role", "user")
     )
     db.add(new_user)
@@ -228,7 +239,7 @@ async def admin_delete_user(user_id: int, db: Session = Depends(get_db)):
         db.commit()
         return {"status": "success"}
     
-#--- TICKETS LOG WITH BACKGROUND EMAIL ACTIONS ---
+# --- TICKETS LOG WITH BACKGROUND EMAIL ACTIONS ---
 
 @app.post("/tickets")
 async def create_ticket(data: dict, bg_tasks: BackgroundTasks, current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -252,7 +263,7 @@ async def close_ticket(ticket_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success"}
 
-#--- NEWS SYSTEM ---
+# --- NEWS SYSTEM ---
 @app.post("/admin/news", dependencies=[Depends(require_admin)])
 async def create_news(data: dict, db: Session = Depends(get_db)):
     news = NewsDB(title=data["title"], content=data["content"])
